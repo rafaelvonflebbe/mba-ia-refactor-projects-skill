@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Audit Dashboard &mdash; task-manager-api</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f1117; color: #e1e4e8; }
+
+  .header { background: linear-gradient(135deg, #1a1d27 0%, #252836 100%); padding: 40px; border-bottom: 1px solid #2d3140; }
+  .header h1 { font-size: 28px; font-weight: 700; color: #fff; margin-bottom: 8px; }
+  .header p { font-size: 14px; color: #8b8fa3; }
+
+  .container { max-width: 1200px; margin: 0 auto; padding: 32px; }
+
+  .metrics-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 32px; }
+  .metric-card { background: #1a1d27; border: 1px solid #2d3140; border-radius: 12px; padding: 24px; text-align: center; }
+  .metric-value { font-size: 36px; font-weight: 700; color: #2ed573; }
+  .metric-value.orange { color: #ff9f43; }
+  .metric-value.red { color: #ff4757; }
+  .metric-label { font-size: 12px; color: #8b8fa3; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+
+  .cards-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+  .card { background: #1a1d27; border: 1px solid #2d3140; border-radius: 12px; padding: 24px; position: relative; overflow: hidden; }
+  .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+  .card.critical::before { background: #ff4757; }
+  .card.high::before { background: #ff9f43; }
+  .card.medium::before { background: #feca57; }
+  .card.low::before { background: #54a0ff; }
+  .card-label { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #8b8fa3; margin-bottom: 8px; }
+  .card-values { display: flex; align-items: baseline; gap: 12px; }
+  .card-before { font-size: 28px; font-weight: 700; color: #ff4757; }
+  .card-arrow { font-size: 18px; color: #8b8fa3; }
+  .card-after { font-size: 28px; font-weight: 700; }
+  .card-after.improved { color: #2ed573; }
+  .card-after.same { color: #ff9f43; }
+  .card-diff { font-size: 12px; margin-top: 4px; }
+  .card-diff.positive { color: #2ed573; }
+  .card-diff.neutral { color: #8b8fa3; }
+
+  .section-title { font-size: 18px; font-weight: 600; color: #fff; margin: 32px 0 16px 0; padding-bottom: 8px; border-bottom: 1px solid #2d3140; }
+
+  .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px; }
+  .chart-box { background: #1a1d27; border: 1px solid #2d3140; border-radius: 12px; padding: 24px; }
+  .chart-box h3 { font-size: 14px; color: #8b8fa3; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 20px; }
+  .chart-box canvas { width: 100% !important; height: 220px !important; }
+
+  .progress-section { margin-bottom: 32px; }
+  .progress-bar-container { background: #1a1d27; border: 1px solid #2d3140; border-radius: 12px; padding: 24px; }
+  .progress-item { margin-bottom: 16px; }
+  .progress-item:last-child { margin-bottom: 0; }
+  .progress-label { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; }
+  .progress-label span:first-child { color: #e1e4e8; }
+  .progress-label span:last-child { color: #8b8fa3; }
+  .progress-track { height: 8px; background: #2d3140; border-radius: 4px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 4px; transition: width 1s ease; }
+  .progress-fill.green { background: linear-gradient(90deg, #2ed573, #7bed9f); }
+  .progress-fill.orange { background: linear-gradient(90deg, #ff9f43, #feca57); }
+  .progress-fill.red { background: linear-gradient(90deg, #ff4757, #ff6b81); }
+
+  .resolved-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px; }
+  .resolved-box, .remaining-box { background: #1a1d27; border: 1px solid #2d3140; border-radius: 12px; padding: 24px; }
+  .resolved-box h3, .remaining-box h3 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .resolved-box h3 { color: #2ed573; }
+  .remaining-box h3 { color: #ff4757; }
+  .resolved-box h3 .badge, .remaining-box h3 .badge { font-size: 11px; background: #2d3140; padding: 2px 8px; border-radius: 10px; color: #8b8fa3; }
+
+  .finding-item { padding: 12px 0; border-bottom: 1px solid #2d3140; }
+  .finding-item:last-child { border-bottom: none; }
+  .finding-item .sev { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; margin-right: 8px; }
+  .sev.critical { background: rgba(255,71,87,0.15); color: #ff4757; }
+  .sev.high { background: rgba(255,159,67,0.15); color: #ff9f43; }
+  .sev.medium { background: rgba(254,202,87,0.15); color: #feca57; }
+  .sev.low { background: rgba(84,160,255,0.15); color: #54a0ff; }
+  .finding-item .desc { font-size: 13px; color: #c0c4d0; margin-top: 4px; line-height: 1.5; }
+  .finding-item .file { font-size: 12px; color: #8b8fa3; font-family: 'SF Mono', 'Fira Code', monospace; margin-top: 2px; }
+
+  .footer { text-align: center; padding: 24px; font-size: 12px; color: #8b8fa3; border-top: 1px solid #2d3140; margin-top: 32px; }
+
+  @media (max-width: 768px) {
+    .cards-row, .chart-row, .resolved-grid, .metrics-row { grid-template-columns: 1fr; }
+    .container { padding: 16px; }
+  }
+</style>
+</head>
+<body>
+  <!-- HEADER -->
+  <div class="header">
+    <h1>Architecture Audit Dashboard</h1>
+    <p>task-manager-api &mdash; Comparativo Antes vs Depois da Refatoracao</p>
+  </div>
+
+  <div class="container">
+
+    <!-- METRICAS RESUMO -->
+    <div class="metrics-row">
+      <div class="metric-card">
+        <div class="metric-value">50%</div>
+        <div class="metric-label">Problemas Resolvidos (7 de 14)</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value orange">8</div>
+        <div class="metric-label">Findings Restantes (apos refatoracao)</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value red">2</div>
+        <div class="metric-label">Critical Pendentes</div>
+      </div>
+    </div>
+
+    <!-- CARDS POR SEVERIDADE -->
+    <div class="cards-row">
+      <div class="card critical">
+        <div class="card-label">Critical</div>
+        <div class="card-values">
+          <span class="card-before">4</span>
+          <span class="card-arrow">&rarr;</span>
+          <span class="card-after improved">2</span>
+        </div>
+        <div class="card-diff positive">-2 resolvidos (50% resolvido)</div>
+      </div>
+
+      <div class="card high">
+        <div class="card-label">High</div>
+        <div class="card-values">
+          <span class="card-before">2</span>
+          <span class="card-arrow">&rarr;</span>
+          <span class="card-after improved">1</span>
+        </div>
+        <div class="card-diff positive">-1 resolvido (100% original resolvido; N+1 reclassificado)</div>
+      </div>
+
+      <div class="card medium">
+        <div class="card-label">Medium</div>
+        <div class="card-values">
+          <span class="card-before">4</span>
+          <span class="card-arrow">&rarr;</span>
+          <span class="card-after same">3</span>
+        </div>
+        <div class="card-diff positive">-2 resolvidos, +1 novo (50% resolvido)</div>
+      </div>
+
+      <div class="card low">
+        <div class="card-label">Low</div>
+        <div class="card-values">
+          <span class="card-before">4</span>
+          <span class="card-arrow">&rarr;</span>
+          <span class="card-after improved">2</span>
+        </div>
+        <div class="card-diff positive">-2 resolvidos (50% resolvido)</div>
+      </div>
+    </div>
+
+    <!-- GRAFICOS DE BARRAS -->
+    <div class="chart-row">
+      <div class="chart-box">
+        <h3>Distribuicao Antes</h3>
+        <canvas id="chartBefore"></canvas>
+      </div>
+      <div class="chart-box">
+        <h3>Distribuicao Depois</h3>
+        <canvas id="chartAfter"></canvas>
+      </div>
+    </div>
+
+    <!-- BARRAS DE PROGRESSO POR CATEGORIA -->
+    <div class="progress-section">
+      <div class="section-title">Resolucao por Categoria de Anti-Pattern</div>
+      <div class="progress-bar-container">
+
+        <div class="progress-item">
+          <div class="progress-label"><span>God Class / God File</span><span>1 &rarr; 0 (100% resolvido)</span></div>
+          <div class="progress-track"><div class="progress-fill green" style="width: 100%"></div></div>
+        </div>
+
+        <div class="progress-item">
+          <div class="progress-label"><span>Weak Cryptography</span><span>1 &rarr; 0 (100% resolvido)</span></div>
+          <div class="progress-track"><div class="progress-fill green" style="width: 100%"></div></div>
+        </div>
+
+        <div class="progress-item">
+          <div class="progress-label"><span>Business Logic in Route Layer</span><span>1 &rarr; 0 (100% resolvido)</span></div>
+          <div class="progress-track"><div class="progress-fill green" style="width: 100%"></div></div>
+        </div>
+
+        <div class="progress-item">
+          <div class="progress-label"><span>Sensitive Data Exposure in API</span><span>1 &rarr; 0 (100% resolvido)</span></div>
+          <div class="progress-track"><div class="progress-fill green" style="width: 100%"></div></div>
+        </div>
+
+        <div class="progress-item">
+          <div class="progress-label"><span>Duplicated Code</span><span>1 &rarr; 0 (100% resolvido)</span></div>
+          <div class="progress-track"><div class="progress-fill green" style="width: 100%"></div></div>
+        </div>
+
+        <div class="progress-item">
+          <div class="progress-label"><span>Deprecated API Usage</span><span>1 &rarr; 0 (100% resolvido)</span></div>
+          <div class="progress-track"><div class="progress-fill green" style="width: 100%"></div></div>
+        </div>
+
+        <div class="progress-item">
+          <div class="progress-label"><span>Poor Variable Naming</span><span>1 &rarr; 0 (100% resolvido)</span></div>
+          <div class="progress-track"><div class="progress-fill green" style="width: 100%"></div></div>
+        </div>
+
+        <div class="progress-item">
+          <div class="progress-label"><span>Hardcoded Credentials / Secrets</span><span>1 &rarr; 1 (parcial: SMTP removido, SECRET_KEY fallback resta)</span></div>
+          <div class="progress-track"><div class="progress-fill orange" style="width: 50%"></div></div>
+        </div>
+
+        <div class="progress-item">
+          <div class="progress-label"><span>N+1 Query Problem</span><span>1 &rarr; 1 (0% resolvido; joinedload parcial)</span></div>
+          <div class="progress-track"><div class="progress-fill red" style="width: 10%"></div></div>
+        </div>
+
+        <div class="progress-item">
+          <div class="progress-label"><span>Magic Numbers / Magic Strings</span><span>1 &rarr; 1 (parcial: constantes criadas mas nao usadas em tudo)</span></div>
+          <div class="progress-track"><div class="progress-fill orange" style="width: 40%"></div></div>
+        </div>
+
+        <div class="progress-item">
+          <div class="progress-label"><span>Inadequate Error Handling</span><span>1 &rarr; 1 (parcial: middleware existe, controllers nao usam)</span></div>
+          <div class="progress-track"><div class="progress-fill orange" style="width: 50%"></div></div>
+        </div>
+
+        <div class="progress-item">
+          <div class="progress-label"><span>Unauthenticated Sensitive Endpoints</span><span>1 &rarr; 1 (0% resolvido)</span></div>
+          <div class="progress-track"><div class="progress-fill red" style="width: 0%"></div></div>
+        </div>
+
+        <div class="progress-item">
+          <div class="progress-label"><span>Debug Artifacts in Production</span><span>1 &rarr; 1 (parcial: debug condicional, logging global resta)</span></div>
+          <div class="progress-track"><div class="progress-fill orange" style="width: 50%"></div></div>
+        </div>
+
+        <div class="progress-item">
+          <div class="progress-label"><span>Unused Code / Dead Code</span><span>1 &rarr; 1 (parcial: imports limpos, parse_date e NotificationService restam)</span></div>
+          <div class="progress-track"><div class="progress-fill orange" style="width: 50%"></div></div>
+        </div>
+
+        <div class="progress-item">
+          <div class="progress-label"><span>Unused Dependencies (novo)</span><span>0 &rarr; 1 (marshmallow e requests nunca importados)</span></div>
+          <div class="progress-track"><div class="progress-fill red" style="width: 0%"></div></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- FINDINGS RESOLVIDOS vs PENDENTES -->
+    <div class="resolved-grid">
+      <div class="resolved-box">
+        <h3><span style="color:#2ed573">&#10003;</span> Resolvidos <span class="badge">7 findings</span></h3>
+
+        <div class="finding-item">
+          <span class="sev critical">CRITICAL</span>
+          <div class="desc">God Class / God File &mdash; routes/report_routes.py (223 linhas, 2 dominios) e routes/task_routes.py (300 linhas, multiplas responsabilidades) foram divididos em controllers/, models/, routes/ separados por dominio</div>
+          <div class="file">routes/report_routes.py, routes/task_routes.py &rarr; controllers/*, routes/*, models/*</div>
+        </div>
+
+        <div class="finding-item">
+          <span class="sev critical">CRITICAL</span>
+          <div class="desc">Weak Cryptography &mdash; MD5 sem salt em models/user.py substituido por werkzeug.security generate_password_hash / check_password_hash</div>
+          <div class="file">models/user.py:29-32 &rarr; models/user.py:19-23</div>
+        </div>
+
+        <div class="finding-item">
+          <span class="sev high">HIGH</span>
+          <div class="desc">Business Logic in Route Layer &mdash; toda logica de negocio (queries, validacao, calculos) extraida dos routes para controllers dedicados. Routes agora apenas extraem parametros e delegam</div>
+          <div class="file">routes/task_routes.py, routes/user_routes.py, routes/report_routes.py &rarr; controllers/*</div>
+        </div>
+
+        <div class="finding-item">
+          <span class="sev high">HIGH</span>
+          <div class="desc">Sensitive Data Exposure &mdash; campo password removido do User.to_dict(). Endpoint de login e respostas de API nao expoe mais hash de senhas</div>
+          <div class="file">models/user.py:16-25 &rarr; models/user.py:28-36</div>
+        </div>
+
+        <div class="finding-item">
+          <span class="sev medium">MEDIUM</span>
+          <div class="desc">Duplicated Code &mdash; logica de overdue duplicada em 6 locais substituida por chamadas ao metodo Task.is_overdue(). Validacao de status centralizada via VALID_STATUSES</div>
+          <div class="file">6 arquivos routes/* &rarr; models/task.py:22-29 + utils/helpers.py:22</div>
+        </div>
+
+        <div class="finding-item">
+          <span class="sev medium">MEDIUM</span>
+          <div class="desc">Deprecated API Usage &mdash; datetime.utcnow() substituido por datetime.now(timezone.utc), Model.query.get() por db.session.get(), debug=True tornado condicional via Config</div>
+          <div class="file">models/*.py, routes/*.py, app.py &rarr; controllers/*, models/*, config.py</div>
+        </div>
+
+        <div class="finding-item">
+          <span class="sev low">LOW</span>
+          <div class="desc">Poor Variable Naming &mdash; variaveis de uma letra (t, u, c) em loops complexos substituidas por nomes descritivos (task, user, category)</div>
+          <div class="file">routes/*.py &rarr; controllers/*.py</div>
+        </div>
+      </div>
+
+      <div class="remaining-box">
+        <h3><span style="color:#ff4757">&#9888;</span> Pendentes <span class="badge">8 findings</span></h3>
+
+        <div class="finding-item">
+          <span class="sev critical">CRITICAL</span>
+          <div class="desc">Unauthenticated Sensitive Endpoints &mdash; todos os endpoints CRUD continuam sem autenticacao. Login retorna token fake que nao e validado em nenhuma requisicao</div>
+          <div class="file">routes/*.py, controllers/user_controller.py:157</div>
+        </div>
+
+        <div class="finding-item">
+          <span class="sev critical">CRITICAL</span>
+          <div class="desc">Hardcoded Credentials &mdash; SECRET_KEY com fallback 'dev-secret-key-change-in-production' em config.py. SMTP creds foram resolvidas, mas fallback resta</div>
+          <div class="file">config.py:8</div>
+        </div>
+
+        <div class="finding-item">
+          <span class="sev high">HIGH</span>
+          <div class="desc">N+1 Query Problem &mdash; 4 instancias em controllers: category task counts em loop, priority queries em loop, user task queries em loop, e stats com .all() + iteracao</div>
+          <div class="file">controllers/category_controller.py:14, controllers/report_controller.py:23-24, 49-50, 97-105</div>
+        </div>
+
+        <div class="finding-item">
+          <span class="sev medium">MEDIUM</span>
+          <div class="desc">Inadequate Error Handling &mdash; controllers retornam tuplas (dict, status_code) em vez de levantar AppError. Middleware centralizado existe mas e bypassado</div>
+          <div class="file">controllers/*.py, middlewares/__init__.py:7-11</div>
+        </div>
+
+        <div class="finding-item">
+          <span class="sev medium">MEDIUM</span>
+          <div class="desc">Magic Numbers / Magic Strings &mdash; status strings hardcoded em task_controller.py:205-208 e report_controller.py:17-19 apesar de VALID_STATUSES existir</div>
+          <div class="file">controllers/task_controller.py:205-208, controllers/report_controller.py:17-19, 75-79</div>
+        </div>
+
+        <div class="finding-item">
+          <span class="sev medium">MEDIUM</span>
+          <div class="desc">Unused Dependencies &mdash; marshmallow==3.20.1 e requests==2.31.0 declarados em requirements.txt mas nunca importados (novo finding)</div>
+          <div class="file">requirements.txt:4-5</div>
+        </div>
+
+        <div class="finding-item">
+          <span class="sev low">LOW</span>
+          <div class="desc">Unused Code &mdash; parse_date() em utils/helpers.py nunca chamada. NotificationService.notify_task_assigned/overdue definidos mas sem chamadores</div>
+          <div class="file">utils/helpers.py:15-19, services/notification_service.py:30-47</div>
+        </div>
+
+        <div class="finding-item">
+          <span class="sev low">LOW</span>
+          <div class="desc">Debug Artifacts &mdash; senhas fracas no seed.py ('1234', 'abcd', 'pass') e logging.basicConfig hardcoded em app.py:13</div>
+          <div class="file">seed.py:21-23, app.py:13</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DIAGNOSTICO FINAL -->
+    <div class="section-title">Diagnostico Final</div>
+    <div class="chart-box" style="margin-bottom: 0;">
+      <p style="font-size: 14px; line-height: 1.8; color: #c0c4d0;">
+        A refatoracao do task-manager-api para MVC resolveu <strong style="color: #2ed573;">7 de 14 anti-patterns (50%)</strong>, com foco nas melhorias estruturais mais impactantes. Os resultados mais expressivos foram a <strong style="color: #2ed573;">eliminacao completa de 2 CRITICALs</strong> (God Class e Weak Cryptography) e <strong style="color: #2ed573;">100% dos HIGH originais</strong> (Business Logic in Routes e Sensitive Data Exposure). A separacao em controllers/, models/, routes/, services/ e middlewares/ trouxe clareza arquitetural e testabilidade ao projeto. Porem, persistem <strong style="color: #ff4757;">2 CRITICALs de seguranca</strong> (ausencia total de autenticacao e fallback de SECRET_KEY) e um <strong style="color: #ff9f43;">N+1 Query Problem consolidado como HIGH</strong> que compromete a performance dos endpoints de relatorio. A proxima iteracao deve priorizar autenticacao JWT real, remocao do SECRET_KEY fallback e otimizacao das queries agregadas em report_controller.
+      </p>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    Gerado em Abril 2026 &mdash; Refactor Architect Audit
+  </div>
+
+  <!-- Chart.js para graficos -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script>
+    const colors = { critical: '#ff4757', high: '#ff9f43', medium: '#feca57', low: '#54a0ff' };
+    const chartOpts = {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#8b8fa3', font: { size: 11 } }, grid: { display: false } },
+        y: { ticks: { color: '#8b8fa3', stepSize: 1, font: { size: 11 } }, grid: { color: '#2d3140' }, beginAtZero: true }
+      }
+    };
+
+    new Chart(document.getElementById('chartBefore'), {
+      type: 'bar',
+      data: {
+        labels: ['Critical', 'High', 'Medium', 'Low'],
+        datasets: [{ data: [4, 2, 4, 4], backgroundColor: [colors.critical, colors.high, colors.medium, colors.low], borderRadius: 6, barThickness: 40 }]
+      },
+      options: { ...chartOpts }
+    });
+
+    new Chart(document.getElementById('chartAfter'), {
+      type: 'bar',
+      data: {
+        labels: ['Critical', 'High', 'Medium', 'Low'],
+        datasets: [{ data: [2, 1, 3, 2], backgroundColor: [colors.critical, colors.high, colors.medium, colors.low], borderRadius: 6, barThickness: 40 }]
+      },
+      options: { ...chartOpts }
+    });
+  </script>
+</body>
+</html>

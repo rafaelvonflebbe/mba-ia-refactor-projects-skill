@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Audit Dashboard — code-smells-project</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f1117; color: #e1e4e8; }
+
+  .header { background: linear-gradient(135deg, #1a1d27 0%, #252836 100%); padding: 40px; border-bottom: 1px solid #2d3140; }
+  .header h1 { font-size: 28px; font-weight: 700; color: #fff; margin-bottom: 8px; }
+  .header p { font-size: 14px; color: #8b8fa3; }
+
+  .container { max-width: 1200px; margin: 0 auto; padding: 32px; }
+
+  .cards-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+  .card { background: #1a1d27; border: 1px solid #2d3140; border-radius: 12px; padding: 24px; position: relative; overflow: hidden; }
+  .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+  .card.critical::before { background: #ff4757; }
+  .card.high::before { background: #ff9f43; }
+  .card.medium::before { background: #feca57; }
+  .card.low::before { background: #54a0ff; }
+  .card-label { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #8b8fa3; margin-bottom: 8px; }
+  .card-values { display: flex; align-items: baseline; gap: 12px; }
+  .card-before { font-size: 28px; font-weight: 700; color: #ff4757; }
+  .card-arrow { font-size: 18px; color: #8b8fa3; }
+  .card-after { font-size: 28px; font-weight: 700; }
+  .card-after.improved { color: #2ed573; }
+  .card-after.same { color: #ff9f43; }
+  .card-diff { font-size: 12px; margin-top: 4px; }
+  .card-diff.positive { color: #2ed573; }
+  .card-diff.neutral { color: #8b8fa3; }
+
+  .section-title { font-size: 18px; font-weight: 600; color: #fff; margin: 32px 0 16px 0; padding-bottom: 8px; border-bottom: 1px solid #2d3140; }
+
+  .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px; }
+  .chart-box { background: #1a1d27; border: 1px solid #2d3140; border-radius: 12px; padding: 24px; }
+  .chart-box h3 { font-size: 14px; color: #8b8fa3; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 20px; }
+  .chart-box canvas { width: 100% !important; height: 220px !important; }
+
+  .progress-section { margin-bottom: 32px; }
+  .progress-bar-container { background: #1a1d27; border: 1px solid #2d3140; border-radius: 12px; padding: 24px; }
+  .progress-item { margin-bottom: 16px; }
+  .progress-item:last-child { margin-bottom: 0; }
+  .progress-label { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; }
+  .progress-label span:first-child { color: #e1e4e8; }
+  .progress-label span:last-child { color: #8b8fa3; }
+  .progress-track { height: 8px; background: #2d3140; border-radius: 4px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 4px; transition: width 1s ease; }
+  .progress-fill.green { background: linear-gradient(90deg, #2ed573, #7bed9f); }
+  .progress-fill.orange { background: linear-gradient(90deg, #ff9f43, #feca57); }
+  .progress-fill.red { background: linear-gradient(90deg, #ff4757, #ff6b81); }
+
+  .resolved-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px; }
+  .resolved-box, .remaining-box { background: #1a1d27; border: 1px solid #2d3140; border-radius: 12px; padding: 24px; }
+  .resolved-box h3, .remaining-box h3 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .resolved-box h3 { color: #2ed573; }
+  .remaining-box h3 { color: #ff4757; }
+  .resolved-box h3 .badge, .remaining-box h3 .badge { font-size: 11px; background: #2d3140; padding: 2px 8px; border-radius: 10px; color: #8b8fa3; }
+
+  .finding-item { padding: 12px 0; border-bottom: 1px solid #2d3140; }
+  .finding-item:last-child { border-bottom: none; }
+  .finding-item .sev { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; margin-right: 8px; }
+  .sev.critical { background: rgba(255,71,87,0.15); color: #ff4757; }
+  .sev.high { background: rgba(255,159,67,0.15); color: #ff9f43; }
+  .sev.medium { background: rgba(254,202,87,0.15); color: #feca57; }
+  .sev.low { background: rgba(84,160,255,0.15); color: #54a0ff; }
+  .finding-item .desc { font-size: 13px; color: #c0c4d0; margin-top: 4px; line-height: 1.5; }
+  .finding-item .file { font-size: 12px; color: #8b8fa3; font-family: 'SF Mono', 'Fira Code', monospace; margin-top: 2px; }
+
+  .metrics-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 32px; }
+  .metric-card { background: #1a1d27; border: 1px solid #2d3140; border-radius: 12px; padding: 24px; text-align: center; }
+  .metric-value { font-size: 36px; font-weight: 700; color: #2ed573; }
+  .metric-value.orange { color: #ff9f43; }
+  .metric-value.red { color: #ff4757; }
+  .metric-label { font-size: 12px; color: #8b8fa3; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+
+  .footer { text-align: center; padding: 24px; font-size: 12px; color: #8b8fa3; border-top: 1px solid #2d3140; margin-top: 32px; }
+
+  @media (max-width: 768px) {
+    .cards-row, .chart-row, .resolved-grid, .metrics-row { grid-template-columns: 1fr; }
+    .container { padding: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Architecture Audit Dashboard</h1>
+  <p>code-smells-project — Comparativo Antes vs Depois da Refatoracao MVC</p>
+</div>
+
+<div class="container">
+
+  <div class="metrics-row">
+    <div class="metric-card">
+      <div class="metric-value">66%</div>
+      <div class="metric-label">Problemas Resolvidos (23 de 35)</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-value orange">19</div>
+      <div class="metric-label">Arquivos (antes: 4)</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-value">-57%</div>
+      <div class="metric-label">Findings Criticos (17 &rarr; 3)</div>
+    </div>
+  </div>
+
+  <div class="cards-row">
+    <div class="card critical">
+      <div class="card-label">Critical</div>
+      <div class="card-values">
+        <span class="card-before">17</span>
+        <span class="card-arrow">&rarr;</span>
+        <span class="card-after improved">3</span>
+      </div>
+      <div class="card-diff positive">-14 resolvidos (82%)</div>
+    </div>
+    <div class="card high">
+      <div class="card-label">High</div>
+      <div class="card-values">
+        <span class="card-before">7</span>
+        <span class="card-arrow">&rarr;</span>
+        <span class="card-after improved">3</span>
+      </div>
+      <div class="card-diff positive">-4 resolvidos (57%)</div>
+    </div>
+    <div class="card medium">
+      <div class="card-label">Medium</div>
+      <div class="card-values">
+        <span class="card-before">6</span>
+        <span class="card-arrow">&rarr;</span>
+        <span class="card-after same">3</span>
+      </div>
+      <div class="card-diff positive">-3 resolvidos (50%)</div>
+    </div>
+    <div class="card low">
+      <div class="card-label">Low</div>
+      <div class="card-values">
+        <span class="card-before">5</span>
+        <span class="card-arrow">&rarr;</span>
+        <span class="card-after same">3</span>
+      </div>
+      <div class="card-diff positive">-2 resolvidos (40%)</div>
+    </div>
+  </div>
+
+  <div class="chart-row">
+    <div class="chart-box">
+      <h3>Distribuicao Antes</h3>
+      <canvas id="chartBefore"></canvas>
+    </div>
+    <div class="chart-box">
+      <h3>Distribuicao Depois</h3>
+      <canvas id="chartAfter"></canvas>
+    </div>
+  </div>
+
+  <div class="progress-section">
+    <div class="section-title">Resolucao por Categoria de Anti-Pattern</div>
+    <div class="progress-bar-container">
+      <div class="progress-item">
+        <div class="progress-label"><span>SQL Injection</span><span>10 &rarr; 1 (90% resolvido)</span></div>
+        <div class="progress-track"><div class="progress-fill green" style="width: 90%"></div></div>
+      </div>
+      <div class="progress-item">
+        <div class="progress-label"><span>Hardcoded Credentials</span><span>3 &rarr; 1 (67% resolvido)</span></div>
+        <div class="progress-track"><div class="progress-fill green" style="width: 67%"></div></div>
+      </div>
+      <div class="progress-item">
+        <div class="progress-label"><span>God Class</span><span>1 &rarr; 0 (100% resolvido)</span></div>
+        <div class="progress-track"><div class="progress-fill green" style="width: 100%"></div></div>
+      </div>
+      <div class="progress-item">
+        <div class="progress-label"><span>Unauthenticated Endpoints</span><span>2 &rarr; 1 (50% resolvido)</span></div>
+        <div class="progress-track"><div class="progress-fill orange" style="width: 50%"></div></div>
+      </div>
+      <div class="progress-item">
+        <div class="progress-label"><span>Weak Cryptography</span><span>1 &rarr; 0 (100% resolvido)</span></div>
+        <div class="progress-track"><div class="progress-fill green" style="width: 100%"></div></div>
+      </div>
+      <div class="progress-item">
+        <div class="progress-label"><span>Business Logic in Routes</span><span>3 &rarr; 1 (67% resolvido)</span></div>
+        <div class="progress-track"><div class="progress-fill green" style="width: 67%"></div></div>
+      </div>
+      <div class="progress-item">
+        <div class="progress-label"><span>Sensitive Data Exposure</span><span>3 &rarr; 1 (67% resolvido)</span></div>
+        <div class="progress-track"><div class="progress-fill green" style="width: 67%"></div></div>
+      </div>
+      <div class="progress-item">
+        <div class="progress-label"><span>Tight Coupling</span><span>1 &rarr; 1 (0% resolvido)</span></div>
+        <div class="progress-track"><div class="progress-fill red" style="width: 0%"></div></div>
+      </div>
+      <div class="progress-item">
+        <div class="progress-label"><span>N+1 Query</span><span>3 &rarr; 0 (100% resolvido)</span></div>
+        <div class="progress-track"><div class="progress-fill green" style="width: 100%"></div></div>
+      </div>
+      <div class="progress-item">
+        <div class="progress-label"><span>Duplicated Code</span><span>2 &rarr; 0 (100% resolvido)</span></div>
+        <div class="progress-track"><div class="progress-fill green" style="width: 100%"></div></div>
+      </div>
+      <div class="progress-item">
+        <div class="progress-label"><span>Inadequate Error Handling</span><span>1 &rarr; 1 (0% resolvido)</span></div>
+        <div class="progress-track"><div class="progress-fill red" style="width: 0%"></div></div>
+      </div>
+      <div class="progress-item">
+        <div class="progress-label"><span>Magic Numbers / Debug Artifacts</span><span>4 &rarr; 2 (50% resolvido)</span></div>
+        <div class="progress-track"><div class="progress-fill orange" style="width: 50%"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="resolved-grid">
+    <div class="resolved-box">
+      <h3><span style="color:#2ed573">&#10003;</span> Resolvidos <span class="badge">23 findings</span></h3>
+
+      <div class="finding-item">
+        <span class="sev critical">CRITICAL</span>
+        <div class="desc">10x SQL Injection por string concatenation em models.py — todas as queries agora usam parameterized queries com <code>?</code></div>
+        <div class="file">models.py &rarr; models/*.py</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev critical">CRITICAL</span>
+        <div class="desc">God Class: models.py com 315 linhas e 4 dominios — dividido em 4 model files separados</div>
+        <div class="file">models.py &rarr; product_model.py, user_model.py, order_model.py, report_model.py</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev critical">CRITICAL</span>
+        <div class="desc">Senhas armazenadas em plaintext — agora usa werkzeug generate_password_hash/check_password_hash</div>
+        <div class="file">models.py, database.py &rarr; user_model.py</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev critical">CRITICAL</span>
+        <div class="desc">SECRET_KEY hardcoded no codigo e exposta no health check — movida para env var, removida do /health</div>
+        <div class="file">app.py, controllers.py &rarr; config/settings.py</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev critical">CRITICAL</span>
+        <div class="desc">Admin endpoints sem autenticacao — agora protegidos com @require_admin (Bearer token)</div>
+        <div class="file">app.py &rarr; middlewares/error_handler.py</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev high">HIGH</span>
+        <div class="desc">Senhas expostas nos GET /usuarios e GET /usuarios/&lt;id&gt; — criada serialize_public() sem campo senha</div>
+        <div class="file">models.py &rarr; user_model.py</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev high">HIGH</span>
+        <div class="desc">Notificacoes inline (print ENVIANDO EMAIL/SMS) no controller — extraido para NotificationService</div>
+        <div class="file">controllers.py &rarr; services/notification_service.py</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev high">HIGH</span>
+        <div class="desc">Tight Coupling via global db_connection mutavel — substituido por Flask g com teardown</div>
+        <div class="file">database.py &rarr; database/connection.py</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev medium">MEDIUM</span>
+        <div class="desc">3x N+1 Query em pedidos — substituido por JOINs unicos com helper _build_orders_with_items()</div>
+        <div class="file">models.py &rarr; order_model.py</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev medium">MEDIUM</span>
+        <div class="desc">2x Duplicacao de codigo (pedidos + validacao produto) — extraidos helpers compartilhados</div>
+        <div class="file">models.py, controllers.py &rarr; order_model.py, product_controller.py</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev low">LOW</span>
+        <div class="desc">Magic numbers (descontos, status) — extraidos para settings.DISCOUNT_TIERS e VALID_ORDER_STATUSES</div>
+        <div class="file">models.py, controllers.py &rarr; config/settings.py</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev low">LOW</span>
+        <div class="desc">Debug mode hardcoded True — agora le de settings.DEBUG via variavel de ambiente</div>
+        <div class="file">app.py</div>
+      </div>
+    </div>
+
+    <div class="remaining-box">
+      <h3><span style="color:#ff4757">&#9888;</span> Pendentes <span class="badge">12 findings</span></h3>
+
+      <div class="finding-item">
+        <span class="sev critical">CRITICAL</span>
+        <div class="desc">SQL Injection via admin/query — endpoint executa SQL arbitrario recebido no body</div>
+        <div class="file">routes/admin_routes.py:34</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev critical">CRITICAL</span>
+        <div class="desc">Fallbacks inseguros em secrets: "dev-secret-key-change-in-production", "admin-dev-token"</div>
+        <div class="file">config/settings.py:3,6</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev critical">CRITICAL</span>
+        <div class="desc">Endpoints CRUD sem autenticacao — qualquer anonimo pode criar/deletar produtos, pedidos e usuarios</div>
+        <div class="file">routes/product_routes.py, user_routes.py, order_routes.py</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev high">HIGH</span>
+        <div class="desc">Business Logic no route — admin_routes acessa DB diretamente, sem model/controller</div>
+        <div class="file">routes/admin_routes.py:12-18, 26-43</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev high">HIGH</span>
+        <div class="desc">admin/query pode expor hashes de senha — SELECT * FROM usuarios retorna senhas hashed</div>
+        <div class="file">routes/admin_routes.py:34-38</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev high">HIGH</span>
+        <div class="desc">Route importa database diretamente, quebrando dependencia MVC Routes &rarr; Controllers &rarr; Models</div>
+        <div class="file">routes/admin_routes.py:3</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev medium">MEDIUM</span>
+        <div class="desc">5 queries separadas para contar pedidos por status — poderia ser 1 GROUP BY</div>
+        <div class="file">models/report_model.py:8-14</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev medium">MEDIUM</span>
+        <div class="desc">Raw exception exposta ao cliente em admin/query — str(e) vaza detalhes internos</div>
+        <div class="file">routes/admin_routes.py:43</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev medium">MEDIUM</span>
+        <div class="desc">Conversao float() sem validacao em preco_min/preco_max — gera erro 500 generico</div>
+        <div class="file">routes/product_routes.py:23-26</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev low">LOW</span>
+        <div class="desc">print() no startup em vez de logger</div>
+        <div class="file">app.py:53-56</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev low">LOW</span>
+        <div class="desc">Magic numbers: porta 5000, versao "1.0.0", status "pendente"</div>
+        <div class="file">app.py:57, report_controller.py:12, order_model.py:21,61</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev low">LOW</span>
+        <div class="desc">update_stock() definido mas nunca chamado — logica duplicada em order_model.py</div>
+        <div class="file">models/product_model.py:87-93</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title">Diagnostico Final</div>
+  <div class="chart-box" style="margin-bottom: 0;">
+    <p style="font-size: 14px; line-height: 1.8; color: #c0c4d0;">
+      A refatoracao resolveu <strong style="color: #2ed573;">66% dos problemas</strong> (23 de 35 findings), com foco em arquitetura MVC e seguranca basica.
+      Os 10 casos de SQL Injection por string concatenation foram eliminados, senhas passaram a usar hashing,
+      N+1 queries foram substituidos por JOINs, e o God Class foi dividido em 4 models.<br><br>
+      O que permanece esta <strong style="color: #ff4757;">concentrado em admin_routes.py</strong> — o unico modulo que nao recebeu separacao MVC adequada.
+      Ele acessa DB diretamente, importa o modulo de conexao, e o endpoint <code>/admin/query</code> e responsavel por 5 dos 12 findings restantes.
+      A segunda area critica e a <strong style="color: #ff9f43;">ausencia total de autenticacao nos endpoints CRUD publicos</strong>.
+    </p>
+  </div>
+
+</div>
+
+<div class="footer">
+  Gerado em Abril 2026 &mdash; Refactor Architect Audit
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script>
+  const colors = {
+    critical: '#ff4757',
+    high: '#ff9f43',
+    medium: '#feca57',
+    low: '#54a0ff'
+  };
+
+  const chartOpts = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false }
+    },
+    scales: {
+      x: {
+        ticks: { color: '#8b8fa3', font: { size: 11 } },
+        grid: { display: false }
+      },
+      y: {
+        ticks: { color: '#8b8fa3', stepSize: 2, font: { size: 11 } },
+        grid: { color: '#2d3140' }
+      }
+    }
+  };
+
+  new Chart(document.getElementById('chartBefore'), {
+    type: 'bar',
+    data: {
+      labels: ['Critical', 'High', 'Medium', 'Low'],
+      datasets: [{
+        data: [17, 7, 6, 5],
+        backgroundColor: [colors.critical, colors.high, colors.medium, colors.low],
+        borderRadius: 6,
+        barThickness: 40
+      }]
+    },
+    options: { ...chartOpts }
+  });
+
+  new Chart(document.getElementById('chartAfter'), {
+    type: 'bar',
+    data: {
+      labels: ['Critical', 'High', 'Medium', 'Low'],
+      datasets: [{
+        data: [3, 3, 3, 3],
+        backgroundColor: [colors.critical, colors.high, colors.medium, colors.low],
+        borderRadius: 6,
+        barThickness: 40
+      }]
+    },
+    options: { ...chartOpts }
+  });
+</script>
+</body>
+</html>

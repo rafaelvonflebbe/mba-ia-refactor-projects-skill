@@ -311,8 +311,48 @@ Esses arquivos serviram como contexto persistente entre sessões do Claude Code,
 
 ## C) Resultados
 
-*A ser preenchido.*
+O resultado da primeira auditoria de cada projeto esta dentro do reports/ na raiz do repo. Essa é a referencia de como estava na primeira vez que rodamos a skills antes do refactor acontecer.
+
+- [audit-project-1.md](reports/audit-project-1.md)
+- [audit-project-2.md](reports/audit-project-2.md)
+- [audit-project-3.md](reports/audit-project-3.md)
+
+Para rodar a Segunda vez e pegar uma auditoria após o refactor, decidi adicionar parametros na skills atual que só iria até a fase 2. Gerei um dashboard comparativo no final, que eu pedi pra fazer fora da skill foi colocado dentro do reports/.
+
+O resultado comparativo do report inicial vs pos refactor esta dentro de /reports de cada um dos projetos.
+
+- [audit-project-pos-refactor-1.md](code-smells-project/reports/audit-project-pos-refactor-1.md) | [dashboard-comparativo.html](code-smells-project/reports/dashboard-comparativo.html)
+
+- [audit-project-pos-refactor-2.md](ecommerce-api-legacy/reports/audit-project-pos-refactor-2.md) | [dashboard-comparativo.html](ecommerce-api-legacy/reports/dashboard-comparativo.html)
+
+- [audit-project-pos-refactor-3.md](task-manager-api/reports/audit-project-pos-refactor-3.md) | [dashboard-comparativo.html](task-manager-api/reports/dashboard-comparativo.html)
+
+Daria para apartir disso continuar fazendo as melhorias e seguir uma segunda iteração da skill de refactor.
 
 ## D) Como Executar
 
-*A ser preenchido.*
+Precisa só rodar dentro de cada projeto:
+
+/refactor-arch no '/mba-ia-refactor-projects-skill/code-smells-project'
+/refactor-arch no '/mba-ia-refactor-projects-skill/ecommerce-api-legacy'
+/refactor-arch no '/mba-ia-refactor-projects-skill/task-manager-api'
+
+Ele vai gerar a primeira versão do report dentro de cada projeto. No processo eu copiei manualmente para o reports/ da pasta raiz pra entrega do exercicio conforme pedido.
+
+Quando vai iniciar a fase 3 precisa responder sim ou não pra seguir pro Refactor. Isso foi feito na primeira vez em todos os 3 projetos.
+
+Na segunda vez rodei somente: o refactor-arch audit-only "n" numero que voce quer colocar (pode ser referente a iteração ou numero do proejto)
+
+/refactor-arch audit-only 1 no '/mba-ia-refactor-projects-skill/code-smells-project'
+/refactor-arch audit-only 2 no  '/mba-ia-refactor-projects-skill/ecommerce-api-legacy'
+/refactor-arch audit-only 3 no '/mba-ia-refactor-projects-skill/task-manager-api'
+
+Agora temos os dois arquivos md com a auditoria. Podemos executar a segunda skills criada pra gerar o dashboard.
+
+Adicione como argument o arquivo que esta no reports/ da raiz do projeto e o md que esta no reports do projeto especifico aonde foi feito a auditoria pos refactor. Essa skill audit-dashboard, vai comparar os mds e gerar um relatório em html, que abriram no navegador.
+
+/audit-dashboard '/mba-ia-refactor-projects-skill/reports/audit-project-1.md' '/mba-ia-refactor-projects-skill/code-smells-project/reports/audit-project-pos-refactor-1.md'   
+
+/audit-dashboard '/mba-ia-refactor-projects-skill/reports/audit-project-2.md' '/mba-ia-refactor-projects-skill/code-smells-project/reports/audit-project-pos-refactor-2.md'   
+
+/audit-dashboard '/mba-ia-refactor-projects-skill/reports/audit-project-3.md' '/mba-ia-refactor-projects-skill/code-smells-project/reports/audit-project-pos-refactor-3.md'   

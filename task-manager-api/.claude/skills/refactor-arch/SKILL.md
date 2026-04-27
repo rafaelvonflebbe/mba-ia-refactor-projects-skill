@@ -7,7 +7,29 @@ description: Analisa, audita e refatora projetos automaticamente para o padrao M
 
 Voce e um arquiteto de software especialista em refatoracao. Sua missao e analisar o projeto no diretorio atual, identificar problemas arquiteturais e refatora-lo para o padrao MVC.
 
-Execute obrigatoriamente as 3 fases abaixo, em sequencia. NAO pula etapas.
+## Modo de uso
+
+Esta skill suporta dois modos de invocacao:
+
+- `/refactor-arch` — modo completo: executa as 3 fases (analise, auditoria, refatoracao). Salva o report em `reports/audit-project.md`.
+- `/refactor-arch audit-only N` — modo audit-only: executa apenas as Fases 1 e 2 (analise + auditoria), SEM refatoracao. Salva o report em `reports/audit-project-pos-refactor-N.md`, onde `N` e o numero do projeto passado como argumento.
+
+## Interpretacao dos argumentos
+
+Leia os argumentos passados pelo usuario:
+
+- Se os args contiverem `audit-only` seguido de um numero `N`:
+  - MODO = `audit-only`
+  - PROJECT_NUM = `N`
+  - REPORT_NAME = `reports/audit-project-pos-refactor-N.md`
+  - PULE a Fase 3 inteiramente. Apos a Fase 2, encerre a execucao sem perguntar sobre refatoracao.
+
+- Se nao houver args (invocacao padrao `/refactor-arch`):
+  - MODO = `completo`
+  - REPORT_NAME = `reports/audit-project.md`
+  - Execute as 3 fases normalmente.
+
+Execute obrigatoriamente as fases abaixo, em sequencia. NAO pula etapas.
 
 ---
 
@@ -60,9 +82,19 @@ Para CADA arquivo fonte do projeto, cruze o codigo contra o catalogo de anti-pat
 
 Gere o relatorio seguindo o template em `report-template.md`.
 
-Salve o relatorio em `reports/audit-project.md` (crie a pasta `reports/` se necessario).
+Salve o relatorio em `REPORT_NAME` conforme definido pelos argumentos (crie a pasta `reports/` se necessario).
 
-**IMPORTANTE — PARE AQUI.** Apos exibir o relatorio completo, pergunte ao usuario:
+**Se MODO = audit-only:** Encerre a execucao aqui. NAO pergunte sobre Fase 3, NAO execute refatoracao. Imprima:
+
+```
+================================
+AUDIT-ONLY COMPLETED
+================================
+Report saved: REPORT_NAME
+================================
+```
+
+**Se MODO = completo:** PARE AQUI. Apos exibir o relatorio completo, pergunte ao usuario:
 
 ```
 Fase 2 completada. Seguir com refactoring da (Fase 3)? [s/n]
@@ -73,6 +105,8 @@ SO prossiga para a Fase 3 se o usuario responder `s`,`y` ou `sim`,`yes` explicit
 ---
 
 ## FASE 3 — REFATORACAO PARA MVC
+
+**Executar APENAS no modo completo.** Se MODO = audit-only, esta fase NAO deve ser executada.
 
 Leia os arquivos de referencia:
 - `references/architecture-guidelines.md` — regras do padrao MVC
@@ -145,6 +179,7 @@ PHASE 3: REFACTORING COMPLETE
 
 ## REGRAS GERAIS
 
+- No modo `audit-only`, execute APENAS as Fases 1 e 2. NAO faca refactoring, NAO modifique arquivos fonte.
 - A skill e AGNOSTICA de tecnologia — funciona com qualquer linguagem e framework
 - NUNCA modifique arquivos antes da confirmacao na Fase 2
 - Preserve TODOS os endpoints originais — nenhum pode ser removido

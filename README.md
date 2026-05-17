@@ -245,12 +245,114 @@
 
 ## B) Construção da Skill
 
-*A ser preenchido.*
+### Motivação
+
+Após a análise manual dos 3 projetos (seção A), percebemos que o processo de auditoria e refatoração era repetitivo e passível de automação. A skill `refactor-arch` foi criada para encapsular todo o conhecimento necessário para analisar, auditar e refatorar projetos ao padrão MVC, de forma independente de tecnologia.
+
+### Evolução da Skill
+
+**Versão 1 — Skill por projeto (com viés de stack):**
+- A primeira versão foi criada dentro do diretório `.claude/skills/` do primeiro projeto (`code-smells-project`), com todos os arquivos `.md` na raiz da pasta da skill.
+- Apesar de ter sido solicitado que a skill fosse agnóstica, o Claude gerou exemplos de código específicos para JavaScript e Python, atrelados aos frameworks dos projetos (Flask e Express). Isso aconteceu provavelmente porque os `CLAUDE.md` de cada projeto já continham contexto sobre a stack, influenciando a geração.
+- Foi necessário refatorar explicitamente, pedindo que os exemplos fossem genéricos e não vinculados a nenhum framework ou linguagem específica.
+- Problema adicional identificado: ao precisar ajustar a skill, era necessário replicar mudanças em 3 projetos manualmente.
+
+**Versão 2 — Skill agnóstica + global:**
+- A skill foi movida para `~/.claude/skills/refactor-arch/`, tornando-a disponível globalmente em qualquer projeto do Claude Code.
+- Os exemplos de código foram reescritos em pseudocódigo genérico, sem referência a frameworks específicos.
+- Arquivos de referência foram movidos para um subdiretório `references/`, deixando apenas o `SKILL.md` na raiz da skill — organização mais limpa.
+- **Lição aprendida:** O contexto do `CLAUDE.md` do projeto pode "vazar" para a geração da skill, tornando-a específica quando deveria ser genérica. É importante reforçar no prompt da skill que ela deve ignorar o contexto do projeto atual e ser escrita de forma agnóstica.
+
+**Versão 3 — Distribuição para os projetos:**
+- A skill foi copiada de volta para os diretórios `.claude/skills/` de cada projeto, garantindo que cada projeto seja autocontido e funcione independentemente da configuração global do usuário.
+
+### Estrutura Final
+
+```
+.claude/skills/refactor-arch/
+├── SKILL.md                              # Prompt principal com as 3 fases
+└── references/
+    ├── project-analysis.md               # Heurísticas de detecção de linguagem, framework, banco e arquitetura
+    ├── anti-patterns-catalog.md          # Catálogo de 17 anti-patterns com sinais de detecção
+    ├── report-template.md                # Template do relatório de auditoria
+    ├── architecture-guidelines.md        # Regras do padrão MVC e responsabilidades de cada camada
+    └── refactoring-playbook.md           # Playbook de transformação com padrões antes/depois
+```
+
+### Arquitetura da Skill — 3 Fases
+
+A skill executa obrigatoriamente em sequência:
+
+**Fase 1 — Análise do Projeto:** Detecta automaticamente linguagem, framework, banco de dados, domínio, arquitetura atual e dependências. Utiliza as heurísticas definidas em `references/project-analysis.md`.
+
+**Fase 2 — Auditoria Arquitetural:** Cruza todo o código-fonte contra o catálogo de 17 anti-patterns (`references/anti-patterns-catalog.md`), gera relatório seguindo o template (`references/report-template.md`) e salva em `reports/audit-project.md`. **Pausa para confirmação do usuário** antes de prosseguir.
+
+**Fase 3 — Refatoração para MVC:** Executa a refatoração seguindo as guidelines de arquitetura (`references/architecture-guidelines.md`) e os padrões de transformação (`references/refactoring-playbook.md`). Preserva endpoints existentes e valida o resultado.
+
+### Decisões de Design
+
+- **Agnóstica de tecnologia:** A skill funciona com qualquer linguagem e framework, adaptando a refatoração ao contexto detectado na Fase 1.
+- **Catálogo de anti-patterns extensível:** 17 anti-patterns organizados por severidade (CRITICAL, HIGH, MEDIUM, LOW), com sinais de detecção específicos.
+- **Separação de referências:** Arquivos de referência ficam em `references/` para não poluir o prompt principal. O `SKILL.md` orquestra as fases e referencia os arquivos necessários em cada etapa.
+- **Ponto de confirmação:** A Fase 2 para antes da refatoração, dando ao usuário controle sobre quais mudanças serão aplicadas.
+- **Playbook com antes/depois:** Cada padrão de refatoração inclui exemplos concretos do código antes e depois da transformação.
+
+### Workflow de Planejamento (`.tmp/`)
+
+Para organizar o trabalho antes de executar, foi criado localmente um diretório `.tmp/` (ignorado pelo git via `.gitignore`) com arquivos de planejamento auxiliares:
+
+| Arquivo | Função |
+|---------|--------|
+| `DESAFIO.md` | As informações relevantes para consulta rápida durante o desenvolvimento |
+| `ENTREGA.md` | Checklist de requisitos da entrega, estrutura esperada do repositório e critérios de aceitação |
+| `PLANO.md` | Plano de execução detalhado (criado com auxílio do Claude), com etapas numeradas e tabela de anti-patterns por projeto |
+
+Esses arquivos serviram como contexto persistente entre sessões do Claude Code, evitando perda de informações do desafio e permitindo que o agente mantivesse coerência com os requisitos ao longo do processo.
 
 ## C) Resultados
 
-*A ser preenchido.*
+O resultado da primeira auditoria de cada projeto esta dentro do reports/ na raiz do repo. Essa é a referencia de como estava na primeira vez que rodamos a skills antes do refactor acontecer.
+
+- [audit-project-1.md](reports/audit-project-1.md)
+- [audit-project-2.md](reports/audit-project-2.md)
+- [audit-project-3.md](reports/audit-project-3.md)
+
+Para rodar a Segunda vez e pegar uma auditoria após o refactor, decidi adicionar parametros na skills atual que só iria até a fase 2. Gerei um dashboard comparativo no final, que eu pedi pra fazer fora da skill foi colocado dentro do reports/.
+
+O resultado comparativo do report inicial vs pos refactor esta dentro de /reports de cada um dos projetos.
+
+- [audit-project-pos-refactor-1.md](code-smells-project/reports/audit-project-pos-refactor-1.md) | [dashboard-comparativo.html](code-smells-project/reports/dashboard-comparativo.html)
+
+- [audit-project-pos-refactor-2.md](ecommerce-api-legacy/reports/audit-project-pos-refactor-2.md) | [dashboard-comparativo.html](ecommerce-api-legacy/reports/dashboard-comparativo.html)
+
+- [audit-project-pos-refactor-3.md](task-manager-api/reports/audit-project-pos-refactor-3.md) | [dashboard-comparativo.html](task-manager-api/reports/dashboard-comparativo.html)
+
+Daria para apartir disso continuar fazendo as melhorias e seguir uma segunda iteração da skill de refactor.
 
 ## D) Como Executar
 
-*A ser preenchido.*
+Precisa só rodar dentro de cada projeto:
+
+/refactor-arch no '/mba-ia-refactor-projects-skill/code-smells-project'
+/refactor-arch no '/mba-ia-refactor-projects-skill/ecommerce-api-legacy'
+/refactor-arch no '/mba-ia-refactor-projects-skill/task-manager-api'
+
+Ele vai gerar a primeira versão do report dentro de cada projeto. No processo eu copiei manualmente para o reports/ da pasta raiz pra entrega do exercicio conforme pedido.
+
+Quando vai iniciar a fase 3 precisa responder sim ou não pra seguir pro Refactor. Isso foi feito na primeira vez em todos os 3 projetos.
+
+Na segunda vez rodei somente: o refactor-arch audit-only "n" numero que voce quer colocar (pode ser referente a iteração ou numero do proejto)
+
+/refactor-arch audit-only 1 no '/mba-ia-refactor-projects-skill/code-smells-project'
+/refactor-arch audit-only 2 no  '/mba-ia-refactor-projects-skill/ecommerce-api-legacy'
+/refactor-arch audit-only 3 no '/mba-ia-refactor-projects-skill/task-manager-api'
+
+Agora temos os dois arquivos md com a auditoria. Podemos executar a segunda skills criada pra gerar o dashboard.
+
+Adicione como argument o arquivo que esta no reports/ da raiz do projeto e o md que esta no reports do projeto especifico aonde foi feito a auditoria pos refactor. Essa skill audit-dashboard, vai comparar os mds e gerar um relatório em html, que abriram no navegador.
+
+/audit-dashboard '/mba-ia-refactor-projects-skill/reports/audit-project-1.md' '/mba-ia-refactor-projects-skill/code-smells-project/reports/audit-project-pos-refactor-1.md'   
+
+/audit-dashboard '/mba-ia-refactor-projects-skill/reports/audit-project-2.md' '/mba-ia-refactor-projects-skill/code-smells-project/reports/audit-project-pos-refactor-2.md'   
+
+/audit-dashboard '/mba-ia-refactor-projects-skill/reports/audit-project-3.md' '/mba-ia-refactor-projects-skill/code-smells-project/reports/audit-project-pos-refactor-3.md'   

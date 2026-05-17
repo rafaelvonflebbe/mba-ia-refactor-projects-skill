@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Audit Dashboard — ecommerce-api-legacy</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f1117; color: #e1e4e8; }
+
+  .header { background: linear-gradient(135deg, #1a1d27 0%, #252836 100%); padding: 40px; border-bottom: 1px solid #2d3140; }
+  .header h1 { font-size: 28px; font-weight: 700; color: #fff; margin-bottom: 8px; }
+  .header p { font-size: 14px; color: #8b8fa3; }
+
+  .container { max-width: 1200px; margin: 0 auto; padding: 32px; }
+
+  .metrics-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 32px; }
+  .metric-card { background: #1a1d27; border: 1px solid #2d3140; border-radius: 12px; padding: 24px; text-align: center; }
+  .metric-value { font-size: 36px; font-weight: 700; color: #2ed573; }
+  .metric-value.orange { color: #ff9f43; }
+  .metric-value.red { color: #ff4757; }
+  .metric-label { font-size: 12px; color: #8b8fa3; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+
+  .cards-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+  .card { background: #1a1d27; border: 1px solid #2d3140; border-radius: 12px; padding: 24px; position: relative; overflow: hidden; }
+  .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+  .card.critical::before { background: #ff4757; }
+  .card.high::before { background: #ff9f43; }
+  .card.medium::before { background: #feca57; }
+  .card.low::before { background: #54a0ff; }
+  .card-label { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #8b8fa3; margin-bottom: 8px; }
+  .card-values { display: flex; align-items: baseline; gap: 12px; }
+  .card-before { font-size: 28px; font-weight: 700; color: #ff4757; }
+  .card-arrow { font-size: 18px; color: #8b8fa3; }
+  .card-after { font-size: 28px; font-weight: 700; }
+  .card-after.improved { color: #2ed573; }
+  .card-after.same { color: #ff9f43; }
+  .card-diff { font-size: 12px; margin-top: 4px; }
+  .card-diff.positive { color: #2ed573; }
+  .card-diff.neutral { color: #8b8fa3; }
+
+  .section-title { font-size: 18px; font-weight: 600; color: #fff; margin: 32px 0 16px 0; padding-bottom: 8px; border-bottom: 1px solid #2d3140; }
+
+  .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px; }
+  .chart-box { background: #1a1d27; border: 1px solid #2d3140; border-radius: 12px; padding: 24px; }
+  .chart-box h3 { font-size: 14px; color: #8b8fa3; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 20px; }
+  .chart-box canvas { width: 100% !important; height: 220px !important; }
+
+  .progress-section { margin-bottom: 32px; }
+  .progress-bar-container { background: #1a1d27; border: 1px solid #2d3140; border-radius: 12px; padding: 24px; }
+  .progress-item { margin-bottom: 16px; }
+  .progress-item:last-child { margin-bottom: 0; }
+  .progress-label { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; }
+  .progress-label span:first-child { color: #e1e4e8; }
+  .progress-label span:last-child { color: #8b8fa3; }
+  .progress-track { height: 8px; background: #2d3140; border-radius: 4px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 4px; transition: width 1s ease; }
+  .progress-fill.green { background: linear-gradient(90deg, #2ed573, #7bed9f); }
+  .progress-fill.orange { background: linear-gradient(90deg, #ff9f43, #feca57); }
+  .progress-fill.red { background: linear-gradient(90deg, #ff4757, #ff6b81); }
+
+  .resolved-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px; }
+  .resolved-box, .remaining-box { background: #1a1d27; border: 1px solid #2d3140; border-radius: 12px; padding: 24px; }
+  .resolved-box h3, .remaining-box h3 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .resolved-box h3 { color: #2ed573; }
+  .remaining-box h3 { color: #ff4757; }
+  .resolved-box h3 .badge, .remaining-box h3 .badge { font-size: 11px; background: #2d3140; padding: 2px 8px; border-radius: 10px; color: #8b8fa3; }
+
+  .finding-item { padding: 12px 0; border-bottom: 1px solid #2d3140; }
+  .finding-item:last-child { border-bottom: none; }
+  .finding-item .sev { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; margin-right: 8px; }
+  .sev.critical { background: rgba(255,71,87,0.15); color: #ff4757; }
+  .sev.high { background: rgba(255,159,67,0.15); color: #ff9f43; }
+  .sev.medium { background: rgba(254,202,87,0.15); color: #feca57; }
+  .sev.low { background: rgba(84,160,255,0.15); color: #54a0ff; }
+  .finding-item .desc { font-size: 13px; color: #c0c4d0; margin-top: 4px; line-height: 1.5; }
+  .finding-item .file { font-size: 12px; color: #8b8fa3; font-family: 'SF Mono', 'Fira Code', monospace; margin-top: 2px; }
+
+  .footer { text-align: center; padding: 24px; font-size: 12px; color: #8b8fa3; border-top: 1px solid #2d3140; margin-top: 32px; }
+
+  @media (max-width: 768px) {
+    .cards-row, .chart-row, .resolved-grid, .metrics-row { grid-template-columns: 1fr; }
+    .container { padding: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Architecture Audit Dashboard</h1>
+  <p>ecommerce-api-legacy — Comparativo Antes vs Depois da Refatoracao MVC</p>
+</div>
+
+<div class="container">
+
+  <div class="metrics-row">
+    <div class="metric-card">
+      <div class="metric-value">73%</div>
+      <div class="metric-label">Problemas Originais Resolvidos (11 de 15)</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-value orange">19</div>
+      <div class="metric-label">Arquivos (antes: 3)</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-value">-75%</div>
+      <div class="metric-label">Findings Criticos (4 &rarr; 1)</div>
+    </div>
+  </div>
+
+  <div class="cards-row">
+    <div class="card critical">
+      <div class="card-label">Critical</div>
+      <div class="card-values">
+        <span class="card-before">4</span>
+        <span class="card-arrow">&rarr;</span>
+        <span class="card-after improved">1</span>
+      </div>
+      <div class="card-diff positive">-3 resolvidos (75%)</div>
+    </div>
+    <div class="card high">
+      <div class="card-label">High</div>
+      <div class="card-values">
+        <span class="card-before">4</span>
+        <span class="card-arrow">&rarr;</span>
+        <span class="card-after same">3</span>
+      </div>
+      <div class="card-diff positive">-1 resolvido (25%)</div>
+    </div>
+    <div class="card medium">
+      <div class="card-label">Medium</div>
+      <div class="card-values">
+        <span class="card-before">3</span>
+        <span class="card-arrow">&rarr;</span>
+        <span class="card-after same">3</span>
+      </div>
+      <div class="card-diff neutral">0 resolvidos (3 novos identificados)</div>
+    </div>
+    <div class="card low">
+      <div class="card-label">Low</div>
+      <div class="card-values">
+        <span class="card-before">4</span>
+        <span class="card-arrow">&rarr;</span>
+        <span class="card-after same">3</span>
+      </div>
+      <div class="card-diff positive">-1 resolvido (25%)</div>
+    </div>
+  </div>
+
+  <div class="chart-row">
+    <div class="chart-box">
+      <h3>Distribuicao Antes</h3>
+      <canvas id="chartBefore"></canvas>
+    </div>
+    <div class="chart-box">
+      <h3>Distribuicao Depois</h3>
+      <canvas id="chartAfter"></canvas>
+    </div>
+  </div>
+
+  <div class="progress-section">
+    <div class="section-title">Resolucao por Categoria de Anti-Pattern</div>
+    <div class="progress-bar-container">
+      <div class="progress-item">
+        <div class="progress-label"><span>Hardcoded Credentials</span><span>1 &rarr; 0 (100% resolvido)</span></div>
+        <div class="progress-track"><div class="progress-fill green" style="width: 100%"></div></div>
+      </div>
+      <div class="progress-item">
+        <div class="progress-label"><span>God Class</span><span>1 &rarr; 0 (100% resolvido)</span></div>
+        <div class="progress-track"><div class="progress-fill green" style="width: 100%"></div></div>
+      </div>
+      <div class="progress-item">
+        <div class="progress-label"><span>Weak Cryptography</span><span>1 &rarr; 0 (100% resolvido)</span></div>
+        <div class="progress-track"><div class="progress-fill green" style="width: 100%"></div></div>
+      </div>
+      <div class="progress-item">
+        <div class="progress-label"><span>Business Logic in Routes</span><span>1 &rarr; 0 (100% resolvido)</span></div>
+        <div class="progress-track"><div class="progress-fill green" style="width: 100%"></div></div>
+      </div>
+      <div class="progress-item">
+        <div class="progress-label"><span>Callback / Promise Nesting Hell</span><span>1 &rarr; 0 (100% resolvido)</span></div>
+        <div class="progress-track"><div class="progress-fill green" style="width: 100%"></div></div>
+      </div>
+      <div class="progress-item">
+        <div class="progress-label"><span>N+1 Query Problem</span><span>1 &rarr; 0 (100% resolvido)</span></div>
+        <div class="progress-track"><div class="progress-fill green" style="width: 100%"></div></div>
+      </div>
+      <div class="progress-item">
+        <div class="progress-label"><span>Inadequate Error Handling</span><span>1 &rarr; 0 (100% resolvido)</span></div>
+        <div class="progress-track"><div class="progress-fill green" style="width: 100%"></div></div>
+      </div>
+      <div class="progress-item">
+        <div class="progress-label"><span>Deprecated API Usage</span><span>1 &rarr; 0 (100% resolvido)</span></div>
+        <div class="progress-track"><div class="progress-fill green" style="width: 100%"></div></div>
+      </div>
+      <div class="progress-item">
+        <div class="progress-label"><span>Poor Variable Naming</span><span>1 &rarr; 0 (100% resolvido)</span></div>
+        <div class="progress-track"><div class="progress-fill green" style="width: 100%"></div></div>
+      </div>
+      <div class="progress-item">
+        <div class="progress-label"><span>Unauthenticated Endpoints</span><span>1 &rarr; 1 (0% resolvido)</span></div>
+        <div class="progress-track"><div class="progress-fill red" style="width: 0%"></div></div>
+      </div>
+      <div class="progress-item">
+        <div class="progress-label"><span>Sensitive Data Exposure</span><span>1 &rarr; 1 (melhorou: logs &rarr; query result)</span></div>
+        <div class="progress-track"><div class="progress-fill orange" style="width: 50%"></div></div>
+      </div>
+      <div class="progress-item">
+        <div class="progress-label"><span>Tight Coupling / Global State</span><span>1 &rarr; 1 (melhorou: DI, mas controller bypassa model)</span></div>
+        <div class="progress-track"><div class="progress-fill orange" style="width: 50%"></div></div>
+      </div>
+      <div class="progress-item">
+        <div class="progress-label"><span>Magic Numbers / Strings</span><span>1 &rarr; 1 (parcial: PAYMENT_STATUS adicionado)</span></div>
+        <div class="progress-track"><div class="progress-fill orange" style="width: 50%"></div></div>
+      </div>
+      <div class="progress-item">
+        <div class="progress-label"><span>Debug Artifacts</span><span>1 &rarr; 1 (0% resolvido)</span></div>
+        <div class="progress-track"><div class="progress-fill red" style="width: 0%"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="resolved-grid">
+    <div class="resolved-box">
+      <h3><span style="color:#2ed573">&#10003;</span> Resolvidos <span class="badge">11 findings</span></h3>
+
+      <div class="finding-item">
+        <span class="sev critical">CRITICAL</span>
+        <div class="desc">Hardcoded Credentials — todos os secrets (dbPass, paymentGatewayKey, smtpUser) estavam no codigo-fonte. Movidos para variaveis de ambiente via config module + dotenv.</div>
+        <div class="file">src/utils.js &rarr; src/config/index.js</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev critical">CRITICAL</span>
+        <div class="desc">God Class — <code>AppManager</code> com 141 linhas acumulava 5 dominios (DB, checkout, reports, users, seed). Dividido em 19 arquivos MVC com models, controllers, routes, services e middlewares separados.</div>
+        <div class="file">src/AppManager.js &rarr; src/models/*.js, src/controllers/*.js, src/routes/*.js</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev critical">CRITICAL</span>
+        <div class="desc">Weak Cryptography — <code>badCrypto()</code> fazia encoding base64 iterativo sem salt. Substituido por <code>bcryptjs</code> com salt rounds 10.</div>
+        <div class="file">src/utils.js &rarr; src/models/userModel.js</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev high">HIGH</span>
+        <div class="desc">Sensitive Data Exposure in Logs — cartao de credito e gateway key eram logados via <code>console.log</code>. Removido do codigo refatorado.</div>
+        <div class="file">src/AppManager.js:45</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev high">HIGH</span>
+        <div class="desc">Business Logic in Route Layer — checkout handler acumulava validacao, user creation, payment, enrollment e audit em uma funcao. Extraido para <code>checkoutController</code> + models + <code>paymentService</code>.</div>
+        <div class="file">src/AppManager.js:28-78 &rarr; src/controllers/checkoutController.js + src/services/paymentService.js</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev high">HIGH</span>
+        <div class="desc">Callback / Promise Nesting Hell — 5 niveis de callbacks aninhados com contadores manuais. Convertido para async/await com wrapper promisificado do sqlite3.</div>
+        <div class="file">src/AppManager.js:37-77 &rarr; src/database/connection.js</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev medium">MEDIUM</span>
+        <div class="desc">N+1 Query Problem — relatorio financeiro executava 500+ queries em loops. Substituido por unico JOIN query.</div>
+        <div class="file">src/AppManager.js:83-128 &rarr; src/models/reportModel.js</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev medium">MEDIUM</span>
+        <div class="desc">Inadequate Error Handling — respostas genericas ("Erro DB", "Erro Pagamento") sem codigos. Criado <code>errorHandler</code> middleware com classe <code>AppError</code> e formato JSON consistente.</div>
+        <div class="file">src/AppManager.js &rarr; src/middlewares/errorHandler.js</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev medium">MEDIUM</span>
+        <div class="desc">Deprecated API Usage — sqlite3 verbose mode em producao + callbacks. Removido <code>.verbose()</code>, criado wrapper promisificado com async/await.</div>
+        <div class="file">src/AppManager.js:1 &rarr; src/database/connection.js</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev low">LOW</span>
+        <div class="desc">Poor Variable Naming — variaveis <code>u</code>, <code>e</code>, <code>p</code>, <code>cc</code> renomeadas para <code>userName</code>, <code>email</code>, <code>password</code>, <code>cardNumber</code>.</div>
+        <div class="file">src/AppManager.js:29-33 &rarr; src/controllers/checkoutController.js</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev low">LOW</span>
+        <div class="desc">Unused Code — <code>globalCache</code> e <code>totalRevenue</code> removidos. Estado global mutavel eliminado em favor de DI via parametro <code>db</code>.</div>
+        <div class="file">src/utils.js:9-10</div>
+      </div>
+    </div>
+
+    <div class="remaining-box">
+      <h3><span style="color:#ff4757">&#9888;</span> Pendentes <span class="badge">10 findings</span></h3>
+
+      <div class="finding-item">
+        <span class="sev critical">CRITICAL</span>
+        <div class="desc">Unauthenticated Sensitive Endpoints — todos os 3 endpoints (checkout, financial-report, DELETE users) continuam sem autenticacao</div>
+        <div class="file">src/routes/checkoutRoutes.js, reportRoutes.js, userRoutes.js</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev high">HIGH</span>
+        <div class="desc">Hardcoded Default Password — usuario criado com <code>'123456'</code> quando senha nao fornecida no checkout</div>
+        <div class="file">src/controllers/checkoutController.js:21</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev high">HIGH</span>
+        <div class="desc">Password Hash in Query Result — <code>findByEmail</code> retorna campo <code>pass</code> (hash) que nao e necessario no fluxo de checkout</div>
+        <div class="file">src/models/userModel.js:5</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev high">HIGH</span>
+        <div class="desc">Tight Coupling — <code>userController</code> importa <code>all</code> do database e faz query direta na tabela enrollments, bypassando o model layer</div>
+        <div class="file">src/controllers/userController.js:3,13</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev medium">MEDIUM</span>
+        <div class="desc">Unused Configuration Variables — 5 env vars (paymentGatewayKey, smtpUser, smtpPass, dbUser, dbPass) definidas mas nunca utilizadas</div>
+        <div class="file">src/config/index.js:6-10</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev medium">MEDIUM</span>
+        <div class="desc">No Duplicate Enrollment Check — usuario pode se matricular no mesmo curso multiplas vezes</div>
+        <div class="file">src/controllers/checkoutController.js:29</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev medium">MEDIUM</span>
+        <div class="desc">No Input Format Validation — email, courseId, cardNumber nao validados por formato, apenas por presenca</div>
+        <div class="file">src/controllers/checkoutController.js:9-12</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev low">LOW</span>
+        <div class="desc">Dead Code — <code>courseModel.findAll()</code> exportada mas nunca chamada</div>
+        <div class="file">src/models/courseModel.js:7-9</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev low">LOW</span>
+        <div class="desc">Magic Numbers/Strings — Visa check <code>'4'</code>, default passwords, bcrypt salt rounds sem constantes nomeadas</div>
+        <div class="file">src/services/paymentService.js:7, src/controllers/checkoutController.js:21, src/database/schema.js:13</div>
+      </div>
+      <div class="finding-item">
+        <span class="sev low">LOW</span>
+        <div class="desc">Debug Artifacts — <code>console.log</code> e <code>console.error</code> em vez de logger estruturado</div>
+        <div class="file">src/app.js:20, src/middlewares/errorHandler.js:2</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title">Diagnostico Final</div>
+  <div class="chart-box" style="margin-bottom: 0;">
+    <p style="font-size: 14px; line-height: 1.8; color: #c0c4d0;">
+      A refatoracao resolveu <strong style="color: #2ed573;">73% dos problemas originais</strong> (11 de 15 findings). O God Class de 141 linhas foi dividido em 19 arquivos MVC,
+      callbacks aninhados foram convertidos para async/await, a criptografia caseira foi substituida por bcrypt,
+      e o N+1 de 500+ queries foi resolvido com um unico JOIN.<br><br>
+      O problema critico que permanece e a <strong style="color: #ff4757;">ausencia total de autenticacao em todos os endpoints</strong>,
+      incluindo o administrativo. Os findings MEDIUM restantes (validacao de input, matricula duplicada, config nao utilizada) sao
+      <strong style="color: #ff9f43;">problemas que ficaram visiveis apos a reestruturacao</strong> &mdash; existiam antes mas estavam escondidos dentro do God Class.
+      O controller de usuario ainda bypassa o model layer em uma query, sendo o unico ponto onde a separacao MVC nao foi totalmente aplicada.
+    </p>
+  </div>
+
+</div>
+
+<div class="footer">
+  Gerado em Abril 2026 &mdash; Refactor Architect Audit
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script>
+  const colors = {
+    critical: '#ff4757',
+    high: '#ff9f43',
+    medium: '#feca57',
+    low: '#54a0ff'
+  };
+
+  const chartOpts = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false }
+    },
+    scales: {
+      x: {
+        ticks: { color: '#8b8fa3', font: { size: 11 } },
+        grid: { display: false }
+      },
+      y: {
+        ticks: { color: '#8b8fa3', stepSize: 1, font: { size: 11 } },
+        grid: { color: '#2d3140' }
+      }
+    }
+  };
+
+  new Chart(document.getElementById('chartBefore'), {
+    type: 'bar',
+    data: {
+      labels: ['Critical', 'High', 'Medium', 'Low'],
+      datasets: [{
+        data: [4, 4, 3, 4],
+        backgroundColor: [colors.critical, colors.high, colors.medium, colors.low],
+        borderRadius: 6,
+        barThickness: 40
+      }]
+    },
+    options: { ...chartOpts }
+  });
+
+  new Chart(document.getElementById('chartAfter'), {
+    type: 'bar',
+    data: {
+      labels: ['Critical', 'High', 'Medium', 'Low'],
+      datasets: [{
+        data: [1, 3, 3, 3],
+        backgroundColor: [colors.critical, colors.high, colors.medium, colors.low],
+        borderRadius: 6,
+        barThickness: 40
+      }]
+    },
+    options: { ...chartOpts }
+  });
+</script>
+</body>
+</html>

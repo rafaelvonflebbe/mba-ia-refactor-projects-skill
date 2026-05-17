@@ -303,7 +303,7 @@ Para organizar o trabalho antes de executar, foi criado localmente um diretório
 
 | Arquivo | Função |
 |---------|--------|
-| `DESAFIO.md` | Cópia do enunciado do desafio com as informações relevantes para consulta rápida durante o desenvolvimento |
+| `DESAFIO.md` | As informações relevantes para consulta rápida durante o desenvolvimento |
 | `ENTREGA.md` | Checklist de requisitos da entrega, estrutura esperada do repositório e critérios de aceitação |
 | `PLANO.md` | Plano de execução detalhado (criado com auxílio do Claude), com etapas numeradas e tabela de anti-patterns por projeto |
 
